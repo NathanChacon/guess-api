@@ -18,12 +18,8 @@ io.on('connection', (socket: Socket) => {
     console.log('A user connected');
 
 
-    socket.on('chat message', (msg: string) => {
-        console.log(msg)
-        console.log('message: ' + msg);
-
-
-        io.emit('chat message', msg);
+    socket.on('enter room', (roomId: string, userName: string) => {
+        
     });
 
     // Handle 'disconnect' event
