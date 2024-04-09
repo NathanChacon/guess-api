@@ -3,8 +3,24 @@ import http from 'http';
 import cors from 'cors'
 import { Server, Socket } from 'socket.io';
 
+// when he joins a room make sure to disconnect all other rooms
+// take a look at socket error handling
+
 const app = express();
+app.use(cors(
+    {
+        origin: '*'
+    }
+));
 const server = http.createServer(app);
+const rooms = [
+    {
+        title: "sala 1",
+    }, 
+    {
+        title: "sala 2",
+    }
+]
 const io = new Server(server, {
     cors: {
         origin: "*",
@@ -12,20 +28,20 @@ const io = new Server(server, {
         credentials: true
       }
 });
-app.use(cors());
+
+app.get('/rooms', (req, res) => {
+    res.json(rooms);
+});
+
+
 
 io.on('connection', (socket: Socket) => {
-    console.log('A user connected');
-
-
-    socket.on('enter room', (roomId: string, userName: string) => {
+    socket.on("joinRoom", (roomId: string) => {
+        console.log("works", roomId)
+        socket.join(roomId);
         
-    });
-
-    // Handle 'disconnect' event
-    socket.on('disconnect', () => {
-        console.log('A user disconnected');
-    });
+        io.to(roomId).emit("userJoin");
+    })
 });
 
 
@@ -33,4 +49,6 @@ const port = process.env.PORT || 4000;
 server.listen(port, () => {
     console.log(`Server is running on port ${port}`);
 });
+
+
 
