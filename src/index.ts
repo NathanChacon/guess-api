@@ -37,10 +37,15 @@ app.get('/rooms', (req, res) => {
 
 io.on('connection', (socket: Socket) => {
     socket.on("joinRoom", (roomId: string) => {
-        console.log("works", roomId)
+        console.log("works", socket.rooms)
         socket.join(roomId);
         
-        io.to(roomId).emit("userJoin");
+        io.to(roomId).emit("userJoin", {user: socket.id});
+    })
+
+    socket.on('roomMessage', ({roomId, message}) => {
+        console.log("new message", message)
+        io.to(roomId).emit("roomMessage", {fromUser: socket.id, message});
     })
 });
 
