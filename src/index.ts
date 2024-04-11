@@ -37,14 +37,22 @@ app.get('/rooms', (req, res) => {
 
 io.on('connection', (socket: Socket) => {
     socket.on("joinRoom", (roomId: string) => {
-        console.log("works", socket.rooms)
-        socket.join(roomId);
         
+       const currentSocketRooms = socket.rooms
+
+       if(currentSocketRooms && currentSocketRooms?.size > 0){
+            const rooms = currentSocketRooms.keys()
+            const [previousRoom] = rooms;
+            console.log(previousRoom)
+            socket.leave(previousRoom)
+       }
+        
+        socket.join(roomId);
+        console.log(currentSocketRooms)
         io.to(roomId).emit("userJoin", {user: socket.id});
     })
 
     socket.on('roomMessage', ({roomId, message}) => {
-        console.log("new message", message)
         io.to(roomId).emit("roomMessage", {fromUser: socket.id, message});
     })
 });
