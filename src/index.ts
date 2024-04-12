@@ -34,22 +34,28 @@ app.get('/rooms', (req, res) => {
 });
 
 
-
 io.on('connection', (socket: Socket) => {
-    socket.on("joinRoom", (roomId: string) => {
-        
+    socket.on("joinRoom", async (roomId: string) => {
+
        const currentSocketRooms = socket.rooms
 
        if(currentSocketRooms && currentSocketRooms?.size > 0){
             const rooms = currentSocketRooms.keys()
             const [previousRoom] = rooms;
-            console.log(previousRoom)
             socket.leave(previousRoom)
-       }
+       }   
         
         socket.join(roomId);
-        console.log(currentSocketRooms)
-        io.to(roomId).emit("userJoin", {user: socket.id});
+
+        const sockets = await io.in(roomId).fetchSockets();
+
+        const formattedSocketsInRomm = sockets.map((socket) => {
+
+            return {id: socket.id, data: socket.data}
+        })
+
+        console.log(formattedSocketsInRomm)
+        io.to(roomId).emit("userJoin", {user: socket.id, usersInRoom: []});
     })
 
     socket.on('roomMessage', ({roomId, message}) => {
