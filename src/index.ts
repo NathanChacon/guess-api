@@ -36,7 +36,7 @@ app.get('/rooms', (req, res) => {
 
 io.on('connection', (socket: Socket) => {
     socket.on("joinRoom", async (roomId: string) => {
-
+       socket.data.score = 0
        const currentSocketRooms = socket.rooms
 
        if(currentSocketRooms && currentSocketRooms?.size > 0){
@@ -45,21 +45,38 @@ io.on('connection', (socket: Socket) => {
             socket.leave(previousRoom)
        }   
         
-        socket.join(roomId);
+        await socket.join(roomId);
+
+        socket.data.currentRoom = roomId
 
         const sockets = await io.in(roomId).fetchSockets();
 
-        const formattedSocketsInRomm = sockets.map((socket) => {
+        const formattedSocketsInRoom = sockets.map((socket) => {
 
-            return {id: socket.id, data: socket.data}
+            return {userId: socket.id, ...socket.data}
         })
 
-        console.log(formattedSocketsInRomm)
-        io.to(roomId).emit("userJoin", {user: socket.id, usersInRoom: []});
+        const filteredSockets = formattedSocketsInRoom.filter(({userId}) => userId !== socket.id)
+
+        await socket.emit("usersInRoom", {usersInRoom: filteredSockets})
+
+        io.to(roomId).emit("userJoin", {userId: socket.id, ...socket.data});
     })
 
     socket.on('roomMessage', ({roomId, message}) => {
-        io.to(roomId).emit("roomMessage", {fromUser: socket.id, message});
+        io.to(roomId).emit("roomMessage", {fromUser: socket.id, message, data: socket.data});
+    })
+
+
+    socket.on('roomScore', ({roomId}) => {
+
+    })
+
+    socket.on('disconnect', () => {
+        const currentRoom = socket?.data?.currentRoom
+        if(currentRoom){
+            io.to(currentRoom).emit('userLeave', {userId: socket.id, ...socket.data})
+        }
     })
 });
 
