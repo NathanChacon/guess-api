@@ -21,6 +21,10 @@ const rooms = [
         title: "sala 2",
     }
 ]
+
+const roomsStates: any = {}
+
+
 const io = new Server(server, {
     cors: {
         origin: "*",
@@ -34,33 +38,84 @@ app.get('/rooms', (req, res) => {
 });
 
 
-io.on('connection', (socket: Socket) => {
-    socket.on("joinRoom", async (roomId: string) => {
-       socket.data.score = 0
-       const currentSocketRooms = socket.rooms
 
-       if(currentSocketRooms && currentSocketRooms?.size > 0){
-            const rooms = currentSocketRooms.keys()
-            const [previousRoom] = rooms;
-            socket.leave(previousRoom)
-       }   
+
+io.on('connection', (socket: Socket) => {
+
+    const keepSocketInOneRoom = () => {
+        const currentSocketRooms = socket.rooms
+
+        if(currentSocketRooms && currentSocketRooms?.size > 0){
+             const rooms = currentSocketRooms.keys()
+             const [previousRoom] = rooms;
+             socket.leave(previousRoom)
+        }   
+    }
+
+    const getSocketsInRoom = async (roomId: string) => {
+
+        const sockets = await io.in(roomId).fetchSockets();
+
+        const formattedSocketsInRoom = sockets.map((socket) => {
+            return {userId: socket.id, ...socket.data}
+        })
+
+        return formattedSocketsInRoom
+
+    }
+
+    const handleNextPlayer = (sockets: any, roomId: string) => {
+        const socketsSortedByTime = sockets.sort((a: any, b: any) => a.joinTime - b.joinTime);
+        const nextPlayer = socketsSortedByTime.find((socket: any) => !socket?.hasPlayed)
+
+        if(!nextPlayer){
+            socketsSortedByTime.forEach((socket: any) => {
+                socket.hasPlayed = false
+            });
+            const firstPlayer = socketsSortedByTime[0]
+            roomsStates[roomId] = {
+                describer: firstPlayer
+            }
+            return firstPlayer
+        }
+
+        roomsStates[roomId] = {
+            describer: nextPlayer
+        }
+
+        return nextPlayer
+    }
+
+    const setSocketInitialState = () => {
+        socket.data.score = 0
+        socket.data.joinTime = new Date()
+    }
+
+
+    socket.on("joinRoom", async (roomId: string) => {
+        setSocketInitialState()
+
+        keepSocketInOneRoom()
         
         await socket.join(roomId);
 
         socket.data.currentRoom = roomId
 
-        const sockets = await io.in(roomId).fetchSockets();
-
-        const formattedSocketsInRoom = sockets.map((socket) => {
-
-            return {userId: socket.id, ...socket.data}
-        })
+        const formattedSocketsInRoom = await getSocketsInRoom(roomId)
 
         const filteredSockets = formattedSocketsInRoom.filter(({userId}) => userId !== socket.id)
 
         await socket.emit("usersInRoom", {usersInRoom: filteredSockets})
 
-        io.to(roomId).emit("userJoin", {userId: socket.id, ...socket.data});
+        await io.to(roomId).emit("userJoin", {userId: socket.id, ...socket.data});
+
+        if(formattedSocketsInRoom?.length > 1 && !roomsStates[roomId].describer){
+            const nextPlayer = handleNextPlayer(formattedSocketsInRoom, roomId)
+            await io.to(roomId).emit("nextPlayer", {...nextPlayer});
+        }
+        else{
+            await io.to(roomId).emit("roomStopGame");
+        }
     })
 
     socket.on('roomMessage', ({roomId, message}) => {
