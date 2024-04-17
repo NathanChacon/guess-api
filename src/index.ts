@@ -2,17 +2,17 @@ import express from 'express';
 import http from 'http';
 import cors from 'cors'
 import { Server, Socket } from 'socket.io';
-
-// when he joins a room make sure to disconnect all other rooms
-// take a look at socket error handling
+import topics from './topics';
 
 const app = express();
+
 app.use(cors(
     {
         origin: '*'
     }
 ));
 const server = http.createServer(app);
+
 const rooms = [
     {
         title: "sala 1",
@@ -41,15 +41,10 @@ app.get('/rooms', (req, res) => {
 
 
 io.on('connection', (socket: Socket) => {
-
     const keepSocketInOneRoom = () => {
-        const currentSocketRooms = socket.rooms
-
-        if(currentSocketRooms && currentSocketRooms?.size > 0){
-             const rooms = currentSocketRooms.keys()
-             const [previousRoom] = rooms;
-             socket.leave(previousRoom)
-        }   
+       if(socket.data.currentRoom){
+            socket.leave(socket.data.currentRoom)
+       }
     }
 
     const getSocketsInRoom = async (roomId: string) => {
@@ -62,6 +57,25 @@ io.on('connection', (socket: Socket) => {
 
         return formattedSocketsInRoom
 
+    }
+
+    const generateNewRoomTopic = () => {
+        const randomIndex = Math.floor(Math.random() * topics.length);
+        const topic = topics[randomIndex];
+        return topic
+        
+    }
+    
+    const handleNextMatch = (sockets: any, roomId: string) => {
+        const nextPlayer = handleNextPlayer(sockets, roomId)
+        const topic = generateNewRoomTopic()
+
+        roomsStates[roomId].topic = topic
+
+        return {
+            nextPlayer,
+            topic 
+        }
     }
 
     const handleNextPlayer = (sockets: any, roomId: string) => {
@@ -99,7 +113,8 @@ io.on('connection', (socket: Socket) => {
         
         await socket.join(roomId);
 
-        socket.data.currentRoom = roomId
+        socket.data.currentRoom = roomId   
+
 
         const formattedSocketsInRoom = await getSocketsInRoom(roomId)
 
@@ -109,9 +124,11 @@ io.on('connection', (socket: Socket) => {
 
         await io.to(roomId).emit("userJoin", {userId: socket.id, ...socket.data});
 
-        if(formattedSocketsInRoom?.length > 1 && !roomsStates[roomId].describer){
-            const nextPlayer = handleNextPlayer(formattedSocketsInRoom, roomId)
+        if(formattedSocketsInRoom?.length > 1 && !roomsStates[roomId]?.describer){
+            const {nextPlayer, topic} = handleNextMatch(formattedSocketsInRoom, roomId)
             await io.to(roomId).emit("nextPlayer", {...nextPlayer});
+            
+            await io.to(nextPlayer.userId).emit("roomTopic", {topic});
         }
         else{
             await io.to(roomId).emit("roomStopGame");
@@ -122,6 +139,10 @@ io.on('connection', (socket: Socket) => {
         io.to(roomId).emit("roomMessage", {fromUser: socket.id, message, data: socket.data});
     })
 
+    socket.on('roomDescription', ({roomId, description}) => {
+        io.to(roomId).except(socket.id).emit("roomDescription", {fromUser: socket.id, description});
+    })
+
 
     socket.on('roomScore', ({roomId}) => {
 
@@ -130,6 +151,10 @@ io.on('connection', (socket: Socket) => {
     socket.on('disconnect', () => {
         const currentRoom = socket?.data?.currentRoom
         if(currentRoom){
+            const isDescriber = roomsStates[currentRoom]?.describer?.userId == socket.id
+            if(isDescriber){
+                roomsStates[currentRoom].describer = null
+            }
             io.to(currentRoom).emit('userLeave', {userId: socket.id, ...socket.data})
         }
     })
