@@ -3,6 +3,7 @@ import http from 'http';
 import cors from 'cors'
 import { Server, Socket } from 'socket.io';
 import registerRoomHandlers from './socket/handlers/roomHandler'
+import gameState from './gameState';
 
 const app = express();
 
@@ -21,8 +22,6 @@ const rooms = [
         title: "sala 2",
     }
 ]
-
-const roomsStates: any = {}
 
 
 const io = new Server(server, {
@@ -44,11 +43,10 @@ const onConnection = (socket: Socket) => {
     socket.on('disconnect', () => {
         const currentRoom = socket?.data?.currentRoom
         if(currentRoom){
-            const isDescriber = roomsStates[currentRoom]?.describer?.userId == socket.id
-            if(isDescriber){
-                roomsStates[currentRoom].describer = null
-            }
-            io.to(currentRoom).emit('userLeave', {userId: socket.id, ...socket.data})
+            const roomToLeave = gameState.rooms.find(({id}) => id === currentRoom)
+            const removedPlayer = roomToLeave?.removePlayer(socket.id)
+
+            io.to(currentRoom).emit('userLeave', {...removedPlayer})
         }
     })
 

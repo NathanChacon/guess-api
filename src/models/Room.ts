@@ -63,6 +63,23 @@ export default class Room {
         this._currentTopic = topic
     }
 
+    removePlayer(playerId: string): User | undefined {
+        const playerRemoved = this._players.find(({id}) => id === playerId)
+        const newPlayersArray = this._players.filter(({id}) => id !== playerId)
+        const newAlreadyPlayedArray = this._alreadyPlayed.filter(({id}) => id !== playerId)
+
+        if(this._currentPlayer?.id === playerId){
+            this._currentPlayer = null
+            this._currentTopic = null
+        }
+
+        this._players = newPlayersArray
+        this._alreadyPlayed = newAlreadyPlayedArray
+
+        return playerRemoved
+    }
+
+
 
     handleNextMatch() {
         if(this._players.length >= 2){

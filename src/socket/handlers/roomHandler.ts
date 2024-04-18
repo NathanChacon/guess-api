@@ -1,8 +1,7 @@
 import { Socket, Server} from 'socket.io';
 import User from '../../models/User'
 import Room from '../../models/Room'
-
-const rooms: Array<Room> = []
+import gameState from '../../gameState';
 
 
 export default (io: Server, socket: Socket) => {
@@ -15,25 +14,26 @@ export default (io: Server, socket: Socket) => {
 
 
     const joinRoom = async ({roomId}: {roomId: string}) => {
-        const roomAlreadyCreated = rooms.find(({id}) => {return roomId === id})
+        const roomAlreadyCreated = gameState.rooms.find(({id}) => {return roomId === id})
         const room = roomAlreadyCreated || new Room(roomId, roomId, null)
         const user = new User("", socket.id, roomId, 0, new Date())
 
 
         if(!roomAlreadyCreated){
-            rooms.push(room)
+            gameState.rooms.push(room)
         }
-
-        if(!room.hasUser(user.id)){
-            room.addPlayer(user)
-        }
-        
-
-       
 
         keepSocketInOneRoom()
         
         await socket.join(roomId);
+
+        socket.data.currentRoom = roomId
+
+        if(!room.hasUser(user.id)){
+            room.addPlayer(user)
+        }
+
+
 
 
         
