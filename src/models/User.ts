@@ -1,31 +1,25 @@
-class User {
-    private _name: string;
-    private _roomId: string;
-    private _points: number;
+export default class User {
+    name: string;
+    roomId: string | null;
+    points: number;
+    joinTime: Date;
+    id: string;
 
-    constructor(name: string, roomId: string, points: number) {
-        this._name = name;
-        this._roomId = roomId;
-        this._points = points;
+    constructor(name: string, id: string, roomId: string, points: number, joinTime: Date) {
+        this.name = name;
+        this.roomId = roomId;
+        this.points = points;
+        this.joinTime = joinTime
+        this.id = id
     }
 
-    get name(): string {
-        return this._name;
-    }
 
-    get roomId(): string {
-        return this._roomId;
-    }
 
-    set roomId(roomId: string) {
-        this._roomId = roomId;
-    }
-
-    get points(): number {
-        return this._points;
+    clearCurrentRoom():void {
+        this.roomId = null
     }
 
     addPoint() {
-        this._points ++
+        this.points ++
     }
 }
