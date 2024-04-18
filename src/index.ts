@@ -46,7 +46,7 @@ const onConnection = (socket: Socket) => {
             const roomToLeave = gameState.rooms.find(({id}) => id === currentRoom)
             const removedPlayer = roomToLeave?.removePlayer(socket.id)
 
-            io.to(currentRoom).emit('userLeave', {...removedPlayer})
+            io.to(currentRoom).emit('room:user-leave', {...removedPlayer})
         }
     })
 

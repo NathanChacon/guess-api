@@ -42,25 +42,26 @@ export default (io: Server, socket: Socket) => {
 
         const filteredSockets = formattedSocketsInRoom.filter(({id}) => id !== socket.id)
 
-        await socket.emit("usersInRoom", {usersInRoom: filteredSockets})
+        await socket.emit("room:all-users", {usersInRoom: filteredSockets})
 
-        await io.to(roomId).emit("userJoin", {...user});
+        await io.to(roomId).emit("room:user-enter", {...user});
 
         room.handleNextMatch()
+
         if(room.currentPlayer){
-            await io.to(roomId).emit("nextPlayer", {...room.currentPlayer});
-            await io.to(room.currentPlayer.id).emit("roomTopic", {...room});
+            await io.to(roomId).emit("room:next-match", {...room.currentPlayer});
+            await io.to(room.currentPlayer.id).emit("room:topic", {...room});
         }
     }
   
   
-    socket.on("joinRoom", joinRoom);
+    socket.on("room:join", joinRoom);
 
-    socket.on('roomMessage', ({roomId, message}) => {
-        io.to(roomId).emit("roomMessage", {fromUser: socket.id, message, data: socket.data});
+    socket.on('room:chat', ({roomId, message}) => {
+        io.to(roomId).emit("room:chat", {fromUser: socket.id, message, data: socket.data});
     })
 
-    socket.on('roomDescription', ({roomId, description}) => {
-        io.to(roomId).except(socket.id).emit("roomDescription", {fromUser: socket.id, description});
+    socket.on('room:description', ({roomId, description}) => {
+        io.to(roomId).except(socket.id).emit("room:description", {fromUser: socket.id, description});
     })
   }
