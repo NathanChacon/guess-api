@@ -6,6 +6,7 @@ export default class Room {
     private _name: string;
     private _id: string;
     private _currentTopic: string | null ;
+    private _currentDescription: string | null ;
     private _currentPlayer: User | null;
     private _players: Array<User>
     private _alreadyPlayed: Array<User>
@@ -17,6 +18,7 @@ export default class Room {
         this._currentPlayer = null
         this._alreadyPlayed = []
         this._players = []
+        this._currentDescription = null
     }
 
     get name(): string {
@@ -37,6 +39,10 @@ export default class Room {
 
     get currentPlayer(): User | null {
         return this._currentPlayer;
+    }
+
+    get currentDescription(): String | null {
+        return this._currentDescription;
     }
 
     get players (): Array<User> {
@@ -78,10 +84,26 @@ export default class Room {
 
         return playerRemoved
     }
+    
+    startRoom(): {topic: string | null, currentPlayer: User | null} | null{
+        const minPlayersToStart = 2
+        const hasEnouthPlayers = this._players.length >= minPlayersToStart
+        const hasEmptyCurrentPlayer = !this.currentPlayer
+        if(hasEnouthPlayers && hasEmptyCurrentPlayer){
+            this.handleNextMatch()
+            
+            return {
+                topic: this._currentTopic,
+                currentPlayer: this.currentPlayer
+            }
+        }
 
+        return null
 
+    }
 
-    handleNextMatch() {
+    handleNextMatch(): {topic: string | null, currentPlayer: User | null} {
+        this._currentDescription = null
         if(this._players.length >= 2){
            const needToFindNext = this._alreadyPlayed.length >= 1
            if(needToFindNext){
@@ -105,7 +127,16 @@ export default class Room {
            }
 
            this.generateTopic()
-          
         }
+
+                   
+        return {
+            topic: this._currentTopic,
+            currentPlayer: this.currentPlayer
+       }
+    }
+
+    setDescription(descrption: string){
+        this._currentDescription = descrption
     }
 }

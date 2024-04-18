@@ -33,35 +33,46 @@ export default (io: Server, socket: Socket) => {
             room.addPlayer(user)
         }
 
-
-
-
-        
-
         const formattedSocketsInRoom = room.players
 
         const filteredSockets = formattedSocketsInRoom.filter(({id}) => id !== socket.id)
 
-        await socket.emit("room:all-users", {usersInRoom: filteredSockets})
+        await socket.emit("room:current-state", {usersInRoom: filteredSockets, currentPlayer: room.currentPlayer, currentDescription: room.currentDescription})
 
         await io.to(roomId).emit("room:user-enter", {...user});
 
-        room.handleNextMatch()
-
-        if(room.currentPlayer){
-            await io.to(roomId).emit("room:next-match", {...room.currentPlayer});
-            await io.to(room.currentPlayer.id).emit("room:topic", {...room});
+        const newRoomValues = room.startRoom()
+        if(newRoomValues){
+            const {currentPlayer, topic} = newRoomValues
+            await io.to(roomId).emit("room:next-match", {...currentPlayer});
+            await io.to(currentPlayer?.id || "").emit("room:topic", {topic: topic});
         }
     }
   
-  
+    
     socket.on("room:join", joinRoom);
+
+    socket.on("room:user-leave", async () => {
+        const currentRoom = socket?.data?.currentRoom
+        await socket.leave(currentRoom)
+
+        if(currentRoom){
+            const roomToLeave = gameState.rooms.find(({id}) => id === currentRoom)
+            const removedPlayer = roomToLeave?.removePlayer(socket.id)
+
+            io.to(currentRoom).emit('room:user-leave', {...removedPlayer})
+        }
+    })
 
     socket.on('room:chat', ({roomId, message}) => {
         io.to(roomId).emit("room:chat", {fromUser: socket.id, message, data: socket.data});
     })
 
     socket.on('room:description', ({roomId, description}) => {
+        const room = gameState.rooms.find(({id}) => id === roomId)
+        if(room){
+            room.setDescription(description)
+        }
         io.to(roomId).except(socket.id).emit("room:description", {fromUser: socket.id, description});
     })
   }
