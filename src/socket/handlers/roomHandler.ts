@@ -29,24 +29,11 @@ export default (io: Server, socket: Socket) => {
 
         socket.data.currentRoom = roomId
 
-        if(!room.hasUser(user.id)){
-            room.addPlayer(user)
-        }
+        room.join(user)
 
-        const formattedSocketsInRoom = room.players
+        const playersInRoom = room.players.filter(({id}) => id !== socket.id)
 
-        const filteredSockets = formattedSocketsInRoom.filter(({id}) => id !== socket.id)
-
-        await socket.emit("room:current-state", {usersInRoom: filteredSockets, currentPlayer: room.currentPlayer, currentDescription: room.currentDescription})
-
-        await io.to(roomId).emit("room:user-enter", {...user});
-
-        const newRoomValues = room.startRoom()
-        if(newRoomValues){
-            const {currentPlayer, topic} = newRoomValues
-            await io.to(roomId).emit("room:next-match", {...currentPlayer});
-            await io.to(currentPlayer?.id || "").emit("room:topic", {topic: topic});
-        }
+        await socket.emit("room:current-state", {usersInRoom: playersInRoom, currentPlayer: room.currentPlayer, currentDescription: room.currentDescription})
     }
   
     
@@ -58,9 +45,7 @@ export default (io: Server, socket: Socket) => {
 
         if(currentRoom){
             const roomToLeave = gameState.rooms.find(({id}) => id === currentRoom)
-            const removedPlayer = roomToLeave?.removePlayer(socket.id)
-
-            io.to(currentRoom).emit('room:user-leave', {...removedPlayer})
+            roomToLeave?.removePlayer(socket.id)
         }
     })
 

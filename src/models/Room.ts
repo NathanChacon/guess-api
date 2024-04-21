@@ -55,7 +55,10 @@ export default class Room {
     }
 
     addPlayer(player: User) {
-        this._players.push(player)
+        if(!this.hasUser(player.id)){
+            this._players.push(player)
+        }
+       
     }
 
     private restartLine () {
@@ -81,81 +84,95 @@ export default class Room {
     
             // If the countdown reaches zero, stop the interval
             if (timeLeft === 0 || !this._currentTopic || !this._currentPlayer) {
+                this.handleNextMatch()
                 clearInterval(countdownInterval);
             }
         }, 1000);
     }
 
-    removePlayer(playerId: string): User | undefined {
-        const playerRemoved = this._players.find(({id}) => id === playerId)
-        const newPlayersArray = this._players.filter(({id}) => id !== playerId)
-        const newAlreadyPlayedArray = this._alreadyPlayed.filter(({id}) => id !== playerId)
+    private getPossibleNextPlayers(): Array<User>{
+        const sortedPlayersByJoinTime = this._players.sort((playerA: any, playerB: any) => playerA.joinTime - playerB.joinTime)
+        const possiblePlayers = sortedPlayersByJoinTime.filter(({id}) => {
+            const hasPlayed = this._alreadyPlayed.some((alreadyPlayedUser) =>  alreadyPlayedUser.id === id)
+            return !hasPlayed
+        })
 
-        if(this._currentPlayer?.id === playerId){
-            this._currentPlayer = null
-            this._currentTopic = null
-        }
-
-        this._players = newPlayersArray
-        this._alreadyPlayed = newAlreadyPlayedArray
-
-        return playerRemoved
+        return possiblePlayers
     }
 
-    join(user: User) {
-
-    }
-    
-    startRoom(): {topic: string | null, currentPlayer: User | null} | null{
-        const minPlayersToStart = 2
-        const hasEnouthPlayers = this._players.length >= minPlayersToStart
-        const hasEmptyCurrentPlayer = !this.currentPlayer
-        if(hasEnouthPlayers && hasEmptyCurrentPlayer){
-            this.handleNextMatch()
-            
-            return {
-                topic: this._currentTopic,
-                currentPlayer: this.currentPlayer
-            }
-        }
-
-        return null
-
-    }
-
-    handleNextMatch(): {topic: string | null, currentPlayer: User | null} {
-        this._currentDescription = null
-        if(this._players.length >= 2){
-           const needToFindNext = this._alreadyPlayed.length >= 1
-           if(needToFindNext){
-            const sortedPlayersByJoinTime = this._players.sort((playerA: any, playerB: any) => playerA.joinTime - playerB.joinTime)
-            const possiblePlayers = sortedPlayersByJoinTime.filter(({id}) => {
-                const hasPlayed = this._alreadyPlayed.some((alreadyPlayedUser) =>  alreadyPlayedUser.id === id)
-                return !hasPlayed
-            })
-
-            if(possiblePlayers.length > 0){
-                this._currentPlayer = possiblePlayers[0]
-                this._alreadyPlayed.push(possiblePlayers[0])
+    private handleNextPlayer() {
+        const needToFindNext = this._alreadyPlayed.length >= 1
+        if(needToFindNext){
+            const possiblePlayers = this.getPossibleNextPlayers()
+            const everyonePlayed = possiblePlayers.length === 0
+            if(!everyonePlayed){
+                const nextInLine = possiblePlayers[0]
+                this._currentPlayer = nextInLine
+                this._alreadyPlayed.push(nextInLine)
             }
             else{
                 this.restartLine()
             }
-           }
-           else{
-             this._currentPlayer = this._players[0]
-             this._alreadyPlayed.push(this._currentPlayer)
-           }
-
-           this.generateTopic()
-           this.startCountDown()
+        }
+        else{
+          this._currentPlayer = this._players[0]
+          this._alreadyPlayed.push(this._currentPlayer)
         }
 
-                   
-        return {
-            topic: this._currentTopic,
-            currentPlayer: this.currentPlayer
-       }
+    }
+
+    async removePlayer(playerId: string){
+        const playerRemoved = this._players.find(({id}) => id === playerId)
+        const newPlayersArray = this._players.filter(({id}) => id !== playerId)
+        const newAlreadyPlayedArray = this._alreadyPlayed.filter(({id}) => id !== playerId)
+
+       await this._io.to(this._id).emit('room:user-leave', {...playerRemoved})
+
+        this._players = newPlayersArray
+        this._alreadyPlayed = newAlreadyPlayedArray
+
+        if(this._currentPlayer?.id === playerId){
+            this._currentPlayer = null
+            this._currentTopic = null
+            this.handleNextMatch()
+        }
+        
+    }
+
+    async join(user: User) {
+        this.addPlayer(user)
+
+        await this._io.to(this._id).emit("room:user-enter", {...user});
+
+        this.startRoom()
+    }
+
+    
+    
+    async startRoom(){
+        const playersLenghtToStart = 2
+        const hasEnouthPlayers = this._players.length === playersLenghtToStart
+        const hasEmptyCurrentPlayer = !this.currentPlayer
+        if(hasEnouthPlayers && hasEmptyCurrentPlayer){
+            this.handleNextMatch()
+        }
+    }
+
+    async handleNextMatch(){
+        this._currentDescription = null
+        if(this._players.length >= 2){
+            this.handleNextPlayer()
+            this.generateTopic()
+                       
+           await this._io.to(this._id).emit("room:next-match", {...this._currentPlayer});
+           await this._io.to(this._currentPlayer?.id || "").emit("room:topic", {topic: this._currentTopic});
+
+           
+           this.startCountDown()
+        }
+        else{
+            await this._io.to(this._id).emit("room:stop", {});
+        }
     }
 
     setDescription(descrption: string){
