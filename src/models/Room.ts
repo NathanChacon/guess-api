@@ -10,6 +10,8 @@ export default class Room {
     private _currentPlayer: User | null;
     private _players: Array<User>
     private _alreadyPlayed: Array<User>
+    private _alreadyScored: Array<User>
+    private _countDownRef: any
     private _io: Server
     constructor(name: string, id: string, io:Server ) {
         this._name = name;
@@ -18,8 +20,10 @@ export default class Room {
         this._currentPlayer = null
         this._alreadyPlayed = []
         this._players = []
+        this._alreadyScored = []
         this._currentDescription = null
         this._io = io
+        this._countDownRef = ""
     }
 
     get name(): string {
@@ -73,6 +77,10 @@ export default class Room {
         this._currentTopic = topic
     }
 
+    private stopCountdown (){
+        clearInterval(this._countDownRef)
+    }
+
     private startCountDown () {
         let timeLeft = 20; // Example: 60 seconds countdown
 
@@ -88,6 +96,8 @@ export default class Room {
                 clearInterval(countdownInterval);
             }
         }, 1000);
+
+        this._countDownRef = countdownInterval
     }
 
     private getPossibleNextPlayers(): Array<User>{
@@ -159,7 +169,10 @@ export default class Room {
     }
 
     async handleNextMatch(){
+        this.stopCountdown()
+        this._alreadyScored = []
         this._currentDescription = null
+
         if(this._players.length >= 2){
             this.handleNextPlayer()
             this.generateTopic()
@@ -171,7 +184,34 @@ export default class Room {
            this.startCountDown()
         }
         else{
+            this._currentPlayer = null
+            this._currentTopic = null
             await this._io.to(this._id).emit("room:stop", {});
+        }
+    }
+
+
+    handleChat({fromUserId, message}: {fromUserId: string, message: string}){
+        const playerSendingMessage = this._players.find(({id}) => id === fromUserId)
+        if(playerSendingMessage){
+            this._io.to(this._id).emit("room:chat", {fromUser: {...playerSendingMessage}, message});
+            this.handleScore({user: playerSendingMessage, message})
+        }
+    }
+
+    private handleScore({user, message}: {user: User, message: string}){
+        const isMessageCorrect = message === this._currentTopic
+        const playerAlreadyScored = this._alreadyScored.some(({id}) => id === user?.id)
+        const canScore = isMessageCorrect && !playerAlreadyScored
+       
+        if(canScore){
+            this._alreadyScored.push(user)
+            user?.addPoint()
+            this._io.to(this._id).emit("room:score", {...user});
+        }
+
+        if(this._alreadyScored.length === (this._players.length - 1)){
+            this.handleNextMatch()
         }
     }
 

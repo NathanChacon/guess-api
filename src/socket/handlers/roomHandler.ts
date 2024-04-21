@@ -50,7 +50,9 @@ export default (io: Server, socket: Socket) => {
     })
 
     socket.on('room:chat', ({roomId, message}) => {
-        io.to(roomId).emit("room:chat", {fromUser: socket.id, message, data: socket.data});
+        const room = gameState.rooms.find(({id}) => id === roomId)
+        room?.handleChat({fromUserId: socket.id, message})
+        
     })
 
     socket.on('room:description', ({roomId, description}) => {
