@@ -1,6 +1,6 @@
 import User from './User'
 import topics from '../topics';
-
+import {Server} from 'socket.io';
 
 export default class Room {
     private _name: string;
@@ -10,15 +10,16 @@ export default class Room {
     private _currentPlayer: User | null;
     private _players: Array<User>
     private _alreadyPlayed: Array<User>
-
-    constructor(name: string, id: string, currentTopic: string | null) {
+    private _io: Server
+    constructor(name: string, id: string, io:Server ) {
         this._name = name;
         this._id = id;
-        this._currentTopic = currentTopic;
+        this._currentTopic = null;
         this._currentPlayer = null
         this._alreadyPlayed = []
         this._players = []
         this._currentDescription = null
+        this._io = io
     }
 
     get name(): string {
@@ -69,6 +70,22 @@ export default class Room {
         this._currentTopic = topic
     }
 
+    private startCountDown () {
+        let timeLeft = 20; // Example: 60 seconds countdown
+
+        const countdownInterval = setInterval(() => {
+            timeLeft--;
+    
+            // Emit the remaining time to all clients in the room
+            this._io.to(this._id).emit('room:timer', timeLeft);
+    
+            // If the countdown reaches zero, stop the interval
+            if (timeLeft === 0 || !this._currentTopic || !this._currentPlayer) {
+                clearInterval(countdownInterval);
+            }
+        }, 1000);
+    }
+
     removePlayer(playerId: string): User | undefined {
         const playerRemoved = this._players.find(({id}) => id === playerId)
         const newPlayersArray = this._players.filter(({id}) => id !== playerId)
@@ -83,6 +100,10 @@ export default class Room {
         this._alreadyPlayed = newAlreadyPlayedArray
 
         return playerRemoved
+    }
+
+    join(user: User) {
+
     }
     
     startRoom(): {topic: string | null, currentPlayer: User | null} | null{
@@ -127,6 +148,7 @@ export default class Room {
            }
 
            this.generateTopic()
+           this.startCountDown()
         }
 
                    
