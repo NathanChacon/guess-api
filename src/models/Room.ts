@@ -66,9 +66,11 @@ export default class Room {
     }
 
     private restartLine () {
-        const sortedPlayersByJoinTime = this._players.sort((playerA: any, playerB: any) => playerA.joinTime - playerB.joinTime)
-        this._alreadyPlayed = []
-        this._currentPlayer = sortedPlayersByJoinTime[0]
+        const sortedPlayersByJoinTime = this.getSortedPlayersByJoinTime()
+        const currentPlayer = sortedPlayersByJoinTime[0]
+
+        this._currentPlayer = currentPlayer
+        this._alreadyPlayed = [currentPlayer]
     }
 
     private generateTopic () {
@@ -100,35 +102,40 @@ export default class Room {
         this._countDownRef = countdownInterval
     }
 
-    private getPossibleNextPlayers(): Array<User>{
-        const sortedPlayersByJoinTime = this._players.sort((playerA: any, playerB: any) => playerA.joinTime - playerB.joinTime)
-        const possiblePlayers = sortedPlayersByJoinTime.filter(({id}) => {
+    private getSortedPlayersByJoinTime(): Array<User>{
+        return this._players.sort((playerA: any, playerB: any) => playerA.joinTime - playerB.joinTime)
+    }
+
+    private getPlayersWaiting(players: Array<User>){
+        return players.filter(({id}) => {
             const hasPlayed = this._alreadyPlayed.some((alreadyPlayedUser) =>  alreadyPlayedUser.id === id)
             return !hasPlayed
         })
 
-        return possiblePlayers
+    }
+
+    private handleNextWaitingPlayer(): User{
+        const needToFindNext = this._alreadyPlayed.length >= 1
+        const sortedPlayersByJoinTime = this.getSortedPlayersByJoinTime()
+        const playersWaitingToPlay = this.getPlayersWaiting(sortedPlayersByJoinTime)
+        const nextWaitingPlayer = playersWaitingToPlay[0]
+
+        if(!needToFindNext){
+            return sortedPlayersByJoinTime[0]
+        }
+        if(nextWaitingPlayer){
+            return nextWaitingPlayer
+        }
+        else{
+            this._alreadyPlayed = []
+            return sortedPlayersByJoinTime[0]
+        } 
     }
 
     private handleNextPlayer() {
-        const needToFindNext = this._alreadyPlayed.length >= 1
-        if(needToFindNext){
-            const possiblePlayers = this.getPossibleNextPlayers()
-            const everyonePlayed = possiblePlayers.length === 0
-            if(!everyonePlayed){
-                const nextInLine = possiblePlayers[0]
-                this._currentPlayer = nextInLine
-                this._alreadyPlayed.push(nextInLine)
-            }
-            else{
-                this.restartLine()
-            }
-        }
-        else{
-          this._currentPlayer = this._players[0]
-          this._alreadyPlayed.push(this._currentPlayer)
-        }
-
+        const nextPlayer = this.handleNextWaitingPlayer()
+        this._currentPlayer = nextPlayer
+        this._alreadyPlayed.push(nextPlayer)
     }
 
     async removePlayer(playerId: string){
@@ -180,7 +187,6 @@ export default class Room {
            await this._io.to(this._id).emit("room:next-match", {...this._currentPlayer});
            await this._io.to(this._currentPlayer?.id || "").emit("room:topic", {topic: this._currentTopic});
 
-           
            this.startCountDown()
         }
         else{
