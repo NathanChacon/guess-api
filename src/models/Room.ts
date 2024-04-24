@@ -65,14 +65,6 @@ export default class Room {
        
     }
 
-    private restartLine () {
-        const sortedPlayersByJoinTime = this.getSortedPlayersByJoinTime()
-        const currentPlayer = sortedPlayersByJoinTime[0]
-
-        this._currentPlayer = currentPlayer
-        this._alreadyPlayed = [currentPlayer]
-    }
-
     private generateTopic () {
         const randomIndex = Math.floor(Math.random() * topics.length);
         const topic = topics[randomIndex];
@@ -200,7 +192,6 @@ export default class Room {
     handleChat({fromUserId, message}: {fromUserId: string, message: string}){
         const playerSendingMessage = this._players.find(({id}) => id === fromUserId)
         if(playerSendingMessage){
-            this._io.to(this._id).emit("room:chat", {fromUser: {...playerSendingMessage}, message});
             this.handleScore({user: playerSendingMessage, message})
         }
     }
@@ -209,7 +200,11 @@ export default class Room {
         const isMessageCorrect = message === this._currentTopic
         const playerAlreadyScored = this._alreadyScored.some(({id}) => id === user?.id)
         const canScore = isMessageCorrect && !playerAlreadyScored
-       
+        
+        if(!canScore){
+            this._io.to(this._id).emit("room:chat", {fromUser: {...user}, message});
+        }
+
         if(canScore){
             this._alreadyScored.push(user)
             user?.addPoint()
