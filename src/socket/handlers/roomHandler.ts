@@ -13,10 +13,10 @@ export default (io: Server, socket: Socket) => {
      }
 
 
-    const joinRoom = async ({roomId}: {roomId: string}) => {
+    const joinRoom = async ({roomId, userName}: {roomId: string, userName: string}) => {
         const roomAlreadyCreated = gameState.rooms.find(({id}) => {return roomId === id})
         const room = roomAlreadyCreated || new Room(roomId, roomId, io)
-        const user = new User("", socket.id, roomId, 0, new Date())
+        const user = new User(userName, socket.id, roomId, 0, new Date())
 
 
         if(!roomAlreadyCreated){
