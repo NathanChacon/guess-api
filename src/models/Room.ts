@@ -1,6 +1,8 @@
 import User from './User'
 import topics from '../topics';
 import {Server} from 'socket.io';
+import {InvalidUserNameError, UserAlreadyRegisteredError} from '../errors/UserErrors'
+
 
 export default class Room {
     private _name: string;
@@ -52,6 +54,36 @@ export default class Room {
 
     get players (): Array<User> {
         return this._players;
+    }
+
+    private isValidUserName(userName: string){
+               // Check if username is not empty
+            if (userName.trim() === "") {
+                return false;
+            }
+        
+            // Check if userName has more than 10 characters
+            if (userName.length > 10) {
+                return false;
+            }
+        
+            // Check if userName contains special characters
+            var specialCharacters = /[!@#$%^&*(),.?":{}|<>]/;
+            if (specialCharacters.test(userName)) {
+                return false;
+            }
+        
+            // Check if userName contains empty spaces
+            if (/\s/.test(userName)) {
+                return false;
+            }
+        
+            // If all checks pass, userName is valid
+            return true;
+    }
+
+    private nameAlreadyExistis(userName: string){
+        return this._players.some(({name}) => userName.toLowerCase() === name.toLowerCase())          
     }
 
     hasUser(userId: string):boolean {
@@ -149,11 +181,27 @@ export default class Room {
     }
 
     async join(user: User) {
-        this.addPlayer(user)
+        const isValidName = this.isValidUserName(user.name)
+        const isNameAlreadyInTheRoom = this.nameAlreadyExistis(user.name)
+        const isValidUser = isValidName && !isNameAlreadyInTheRoom
+        if(isValidUser){
+            this.addPlayer(user)
 
-        await this._io.to(this._id).emit("room:user-enter", {...user});
+            await this._io.to(this._id).emit("room:user-enter", {...user});
+    
+            this.startRoom()
+        }
+        else{
+            if(!isValidName){
+                throw new InvalidUserNameError("Invalid user name")
+            }
 
-        this.startRoom()
+            if(isNameAlreadyInTheRoom){
+                throw new UserAlreadyRegisteredError("Name already registered")
+            }
+           
+        }
+
     }
 
     

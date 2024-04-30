@@ -2,7 +2,8 @@ import { Socket, Server} from 'socket.io';
 import User from '../../models/User'
 import Room from '../../models/Room'
 import gameState from '../../gameState';
-
+import { InvalidUserNameError, UserAlreadyRegisteredError } from '../../errors/UserErrors';
+ 
 
 export default (io: Server, socket: Socket) => {
 
@@ -13,7 +14,7 @@ export default (io: Server, socket: Socket) => {
      }
 
 
-    const joinRoom = async ({roomId, userName}: {roomId: string, userName: string}) => {
+    const joinRoom = async ({roomId, userName}: {roomId: string, userName: string}, callback: any) => {
         const roomAlreadyCreated = gameState.rooms.find(({id}) => {return roomId === id})
         const room = roomAlreadyCreated || new Room(roomId, roomId, io)
         const user = new User(userName, socket.id, roomId, 0, new Date())
@@ -23,17 +24,35 @@ export default (io: Server, socket: Socket) => {
             gameState.rooms.push(room)
         }
 
-        keepSocketInOneRoom()
+        try{
+            keepSocketInOneRoom()
         
-        await socket.join(roomId);
+            await socket.join(roomId);
+    
+            socket.data.currentRoom = roomId
+    
+            await room.join(user)
+    
+            const playersInRoom = room.players.filter(({id}) => id !== socket.id)
 
-        socket.data.currentRoom = roomId
-
-        room.join(user)
-
-        const playersInRoom = room.players.filter(({id}) => id !== socket.id)
-
-        await socket.emit("room:current-state", {usersInRoom: playersInRoom, currentPlayer: room.currentPlayer, currentDescription: room.currentDescription})
+            await socket.emit("room:current-state", {usersInRoom: playersInRoom, currentPlayer: room.currentPlayer, currentDescription: room.currentDescription})
+        }
+        catch(error){
+            if(error instanceof InvalidUserNameError || error instanceof UserAlreadyRegisteredError) {
+                callback({
+                    status: error.statusCode,
+                    message: error.message,
+                    name: error.name
+                })
+            }
+            else{
+                callback({
+                    status: 500,
+                    message: "Something went wrong",
+                    name: "serverError"
+                })
+            }
+        }
     }
   
     
