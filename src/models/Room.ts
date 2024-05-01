@@ -186,8 +186,6 @@ export default class Room {
         const isValidUser = isValidName && !isNameAlreadyInTheRoom
         if(isValidUser){
             this.addPlayer(user)
-
-            await this._io.to(this._id).emit("room:user-enter", {...user});
     
             this.startRoom()
         }

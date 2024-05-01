@@ -35,7 +35,18 @@ export default (io: Server, socket: Socket) => {
     
             const playersInRoom = room.players.filter(({id}) => id !== socket.id)
 
-            await socket.emit("room:current-state", {usersInRoom: playersInRoom, currentPlayer: room.currentPlayer, currentDescription: room.currentDescription})
+            callback({
+                status: 200,
+                message: "success",
+                name: "sucess",
+                data: {usersInRoom: playersInRoom, currentPlayer: room.currentPlayer, currentDescription: room.currentDescription}
+            })
+
+             io.to(room.id).emit("room:user-enter", {...user});
+
+            //await socket.emit("room:current-state", {usersInRoom: playersInRoom, currentPlayer: room.currentPlayer, currentDescription: room.currentDescription})
+
+
         }
         catch(error){
             if(error instanceof InvalidUserNameError || error instanceof UserAlreadyRegisteredError) {
