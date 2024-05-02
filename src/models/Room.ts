@@ -2,7 +2,7 @@ import User from './User'
 import topics from '../topics';
 import {Server} from 'socket.io';
 import {InvalidUserNameError, UserAlreadyRegisteredError} from '../errors/UserErrors'
-
+import {RoomIsFullError} from '../errors/RoomErrors'
 
 export default class Room {
     private _name: string;
@@ -15,6 +15,8 @@ export default class Room {
     private _alreadyScored: Array<User>
     private _countDownRef: any
     private _io: Server
+    private _maxPlayers = 5
+
     constructor(name: string, id: string, io:Server ) {
         this._name = name;
         this._id = id;
@@ -181,9 +183,15 @@ export default class Room {
     }
 
     async join(user: User) {
+        const isRoomFull = this._players.length === this._maxPlayers
         const isValidName = this.isValidUserName(user.name)
         const isNameAlreadyInTheRoom = this.nameAlreadyExistis(user.name)
         const isValidUser = isValidName && !isNameAlreadyInTheRoom
+
+        if(isRoomFull){
+            throw new RoomIsFullError("Room is full")
+        }
+
         if(isValidUser){
             this.addPlayer(user)
     

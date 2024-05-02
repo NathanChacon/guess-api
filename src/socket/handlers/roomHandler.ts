@@ -3,6 +3,7 @@ import User from '../../models/User'
 import Room from '../../models/Room'
 import gameState from '../../gameState';
 import { InvalidUserNameError, UserAlreadyRegisteredError } from '../../errors/UserErrors';
+import { RoomIsFullError } from '../../errors/RoomErrors';
  
 
 export default (io: Server, socket: Socket) => {
@@ -27,11 +28,11 @@ export default (io: Server, socket: Socket) => {
         try{
             keepSocketInOneRoom()
         
-            await socket.join(roomId);
-    
+            
             socket.data.currentRoom = roomId
     
             await room.join(user)
+            await socket.join(roomId);
     
             const playersInRoom = room.players.filter(({id}) => id !== socket.id)
 
@@ -44,12 +45,9 @@ export default (io: Server, socket: Socket) => {
 
              io.to(room.id).emit("room:user-enter", {...user});
 
-            //await socket.emit("room:current-state", {usersInRoom: playersInRoom, currentPlayer: room.currentPlayer, currentDescription: room.currentDescription})
-
-
         }
         catch(error){
-            if(error instanceof InvalidUserNameError || error instanceof UserAlreadyRegisteredError) {
+            if(error instanceof InvalidUserNameError || error instanceof UserAlreadyRegisteredError || error instanceof RoomIsFullError) {
                 callback({
                     status: error.statusCode,
                     message: error.message,
