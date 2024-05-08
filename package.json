@@ -3,9 +3,11 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
+  "type": "module",
   "scripts": {
-    "build": "tsc",
-    "dev": "node --watch -r ts-node/register src/index.ts",
+    "start": "NODE_PATH=./build node  build/index.js",
+    "build": "tsc -p .",
+    "dev": "nodemon src/index.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -14,6 +16,7 @@
   "devDependencies": {
     "@types/node": "^20.12.4",
     "@types/socket.io": "^3.0.2",
+    "nodemon": "^3.1.0",
     "prisma": "^5.12.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.4.4"

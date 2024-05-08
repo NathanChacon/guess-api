@@ -1,7 +1,7 @@
 export default class User {
     name: string;
     roomId: string | null;
-    points: number;
+    points: number = 0;
     joinTime: Date;
     id: string;
 
@@ -19,7 +19,7 @@ export default class User {
         this.roomId = null
     }
 
-    addPoint() {
-        this.points ++
+    addPoint(points: number) {
+        this.points += points
     }
 }

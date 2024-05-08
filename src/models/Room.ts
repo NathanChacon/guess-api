@@ -116,7 +116,7 @@ export default class Room {
   }
 
   private startCountDown() {
-    let timeLeft = 20; // Example: 60 seconds countdown
+    let timeLeft = 40; // Example: 60 seconds countdown
 
     const countdownInterval = setInterval(() => {
       timeLeft--;
@@ -279,8 +279,9 @@ export default class Room {
 
   private makeScore(user: User){
     this._alreadyScored.push(user);
-    user?.addPoint();
-    this.currentPlayer?.addPoint()
+
+    user?.addPoint(this._guesserPoint);
+    this.currentPlayer?.addPoint(this._writerPoint)
     this._io.to(this._id).emit("room:score", { user, writer: this._currentPlayer });
   }
 

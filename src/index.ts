@@ -32,12 +32,6 @@ const io = new Server(server, {
       }
 });
 
-app.get('/rooms', (req, res) => {
-    res.json(rooms);
-});
-
-
-
 
 const onConnection = (socket: Socket) => {
     socket.on('disconnect', () => {
@@ -55,9 +49,14 @@ const onConnection = (socket: Socket) => {
   
   io.on("connection", onConnection);
 
-const port = process.env.PORT || 4000;
+const port = process.env.PORT || 8080;
+
 server.listen(port, () => {
     console.log(`Server is running on port ${port}`);
+});
+
+app.get('/rooms', (req, res) => {
+    res.json(rooms);
 });
 
 
