@@ -7,7 +7,7 @@
   "scripts": {
     "start": "NODE_PATH=./build node  build/index.js",
     "build": "tsc -p .",
-    "dev": "nodemon src/index.ts",
+    "dev": "tsx src/index.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -19,6 +19,7 @@
     "nodemon": "^3.1.0",
     "prisma": "^5.12.1",
     "ts-node": "^10.9.2",
+    "tsx": "^4.9.3",
     "typescript": "^5.4.4"
   },
   "dependencies": {
