@@ -236,12 +236,13 @@ export default class Room {
     this._currentDescription = null;
 
     if (this._players.length >= 2) {
+      const previousTopic = this._currentTopic
       this.handleNextPlayer();
       this.generateTopic();
 
       await this._io
         .to(this._id)
-        .emit("room:next-match", { ...this._currentPlayer });
+        .emit("room:next-match", { currentPlayer: this._currentPlayer, previousTopic });
       await this._io
         .to(this._currentPlayer?.id || "")
         .emit("room:topic", { topic: this._currentTopic });
