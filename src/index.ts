@@ -8,7 +8,7 @@ import Room from './models/Room';
 import { v4 as uuidv4 } from 'uuid';
 
 const app = express();
-
+console.log("test")
 app.use(cors(
     {
         origin: '*'
