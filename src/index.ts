@@ -4,6 +4,8 @@ import cors from 'cors'
 import { Server, Socket } from 'socket.io';
 import registerRoomHandlers from './socket/handlers/roomHandler'
 import gameState from './gameState';
+import Room from 'models/Room';
+import { v4 as uuidv4 } from 'uuid';
 
 const app = express();
 
@@ -14,15 +16,6 @@ app.use(cors(
 ));
 const server = http.createServer(app);
 
-const rooms = [
-    {
-        title: "sala 1",
-    }, 
-    {
-        title: "sala 2",
-    }
-]
-
 
 const io = new Server(server, {
     cors: {
@@ -32,13 +25,31 @@ const io = new Server(server, {
       }
 });
 
+function generateDefaultRooms() {
+    const rooms = [];
+    for (let i = 1; i <= 6; i++) {
+        rooms.push(
+            new Room(`sala ${i}`, uuidv4(), io)
+        )
+    }
+
+    gameState.rooms = rooms
+}
+
+
+generateDefaultRooms()
+
 
 const onConnection = (socket: Socket) => {
-    socket.on('disconnect', () => {
+    socket.on('disconnect', async () => {
         const currentRoom = socket?.data?.currentRoom
         if(currentRoom){
             const roomToLeave = gameState.rooms.find(({id}) => id === currentRoom)
-            roomToLeave?.removePlayer(socket.id)
+            await roomToLeave?.removePlayer(socket.id)
+            io.emit("room:change-state", {room: {
+                roomId: roomToLeave.id,
+                players: roomToLeave.players.length
+            }})
         }
     })
 
@@ -54,7 +65,14 @@ server.listen(port, () => {
 });
 
 app.get('/rooms', (req, res) => {
-    res.json(rooms);
+    const formattedRooms = gameState.rooms.map((room) => {
+        return {
+            title: room.name,
+            id: room.id,
+            players: room.players.length
+        }
+    })
+    res.json({rooms: formattedRooms});
 });
 
 

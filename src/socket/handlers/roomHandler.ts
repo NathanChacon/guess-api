@@ -44,7 +44,10 @@ export default (io: Server, socket: Socket) => {
             })
 
              io.to(room.id).emit("room:user-enter", {...user});
-
+             io.emit("room:change-state", {room: {
+                roomId: room.id,
+                players: room.players.length
+             }})
         }
         catch(error){
             if(error instanceof InvalidUserNameError || error instanceof UserAlreadyRegisteredError || error instanceof RoomIsFullError) {
@@ -74,6 +77,10 @@ export default (io: Server, socket: Socket) => {
         if(currentRoom){
             const roomToLeave = gameState.rooms.find(({id}) => id === currentRoom)
             roomToLeave?.removePlayer(socket.id)
+            io.emit("room:change-state", {room:{
+                roomId: roomToLeave.id,
+                players: roomToLeave.players.length
+            } })
         }
     })
 
