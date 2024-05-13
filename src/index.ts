@@ -4,7 +4,7 @@ import cors from 'cors'
 import { Server, Socket } from 'socket.io';
 import registerRoomHandlers from './socket/handlers/roomHandler'
 import gameState from './gameState';
-import Room from 'models/Room';
+import Room from './models/Room';
 import { v4 as uuidv4 } from 'uuid';
 
 const app = express();
