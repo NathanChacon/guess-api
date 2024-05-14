@@ -271,7 +271,7 @@ export default class Room {
   }
 
   private canScore ({user, message}: { user: User; message: string }) {
-    const isMessageCorrect = message === this._currentTopic;
+    const isMessageCorrect = message.toLowerCase() === this._currentTopic.toLowerCase();
     const playerAlreadyScored = this._alreadyScored.some(
       ({ id }) => id === user?.id
     );
