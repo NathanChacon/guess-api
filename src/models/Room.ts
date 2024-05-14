@@ -271,11 +271,16 @@ export default class Room {
   }
 
   private canScore ({user, message}: { user: User; message: string }) {
-    const isMessageCorrect = message.toLowerCase() === this._currentTopic.toLowerCase();
-    const playerAlreadyScored = this._alreadyScored.some(
-      ({ id }) => id === user?.id
-    );
-     return isMessageCorrect && !playerAlreadyScored;
+    if(message && this._currentTopic){
+      const isMessageCorrect = message.toLowerCase() === this._currentTopic.toLowerCase();
+      const playerAlreadyScored = this._alreadyScored.some(
+        ({ id }) => id === user?.id
+      );
+       return isMessageCorrect && !playerAlreadyScored;
+    }
+
+    return false
+
   }
 
   private makeScore(user: User){
