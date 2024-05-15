@@ -236,13 +236,16 @@ export default class Room {
     this._currentDescription = null;
 
     if (this._players.length >= 2) {
-      const previousTopic = this._currentTopic
+      const previousTopic = this._currentTopic;
       this.handleNextPlayer();
       this.generateTopic();
 
       await this._io
         .to(this._id)
-        .emit("room:next-match", { currentPlayer: this._currentPlayer, previousTopic });
+        .emit("room:next-match", {
+          currentPlayer: this._currentPlayer,
+          previousTopic,
+        });
       await this._io
         .to(this._currentPlayer?.id || "")
         .emit("room:topic", { topic: this._currentTopic });
@@ -256,43 +259,44 @@ export default class Room {
   }
 
   handleChat({ fromUserId, message }: { fromUserId: string; message: string }) {
-    const canSendMessage = fromUserId !== this._currentPlayer?.id
+    const canSendMessage = fromUserId !== this._currentPlayer?.id;
 
-    if(canSendMessage){
-        const playerSendingMessage = this._players.find(
-            ({ id }) => id === fromUserId
-          );
-         
-          if (playerSendingMessage) {
-            this.handleScore({ user: playerSendingMessage, message });
-          }
+    if (canSendMessage) {
+      const playerSendingMessage = this._players.find(
+        ({ id }) => id === fromUserId
+      );
+
+      if (playerSendingMessage) {
+        this.handleScore({ user: playerSendingMessage, message });
+      }
     }
-
   }
 
-  private canScore ({user, message}: { user: User; message: string }) {
-    if(message && this._currentTopic){
-      const isMessageCorrect = message.toLowerCase() === this._currentTopic.toLowerCase();
+  private canScore({ user, message }: { user: User; message: string }) {
+    if (message && this._currentTopic) {
+      const isMessageCorrect =
+        message.toLowerCase() === this._currentTopic.toLowerCase();
       const playerAlreadyScored = this._alreadyScored.some(
         ({ id }) => id === user?.id
       );
-       return isMessageCorrect && !playerAlreadyScored;
+      return isMessageCorrect && !playerAlreadyScored;
     }
 
-    return false
-
+    return false;
   }
 
-  private makeScore(user: User){
+  private makeScore(user: User) {
     this._alreadyScored.push(user);
 
     user?.addPoint(this._guesserPoint);
-    this.currentPlayer?.addPoint(this._writerPoint)
-    this._io.to(this._id).emit("room:score", { user, writer: this._currentPlayer });
+    this.currentPlayer?.addPoint(this._writerPoint);
+    this._io
+      .to(this._id)
+      .emit("room:score", { user, writer: this._currentPlayer });
   }
 
   private handleScore({ user, message }: { user: User; message: string }) {
-    const canScore = this.canScore({user, message})
+    const canScore = this.canScore({ user, message });
 
     if (!canScore) {
       this._io
@@ -301,7 +305,7 @@ export default class Room {
     }
 
     if (canScore) {
-        this.makeScore(user)
+      this.makeScore(user);
     }
 
     if (this._alreadyScored.length === this._players.length - 1) {
