@@ -7,6 +7,11 @@ import {
 } from "../errors/UserErrors";
 import { RoomIsFullError } from "../errors/RoomErrors";
 
+enum Points {
+  writerPoint = 10,
+  guesserPoint = 20,
+}
+
 export default class Room {
   private _name: string;
   private _id: string;
@@ -19,8 +24,8 @@ export default class Room {
   private _countDownRef: any;
   private _io: Server;
   private _maxPlayers = 5;
-  private _writerPoint = 10;
-  private _guesserPoint = 20;
+  private _writerPoint = Points.writerPoint;
+  private _guesserPoint = Points.guesserPoint;
 
   constructor(name: string, id: string, io: Server) {
     this._name = name;
@@ -240,12 +245,10 @@ export default class Room {
       this.handleNextPlayer();
       this.generateTopic();
 
-      await this._io
-        .to(this._id)
-        .emit("room:next-match", {
-          currentPlayer: this._currentPlayer,
-          previousTopic,
-        });
+      await this._io.to(this._id).emit("room:next-match", {
+        currentPlayer: this._currentPlayer,
+        previousTopic,
+      });
       await this._io
         .to(this._currentPlayer?.id || "")
         .emit("room:topic", { topic: this._currentTopic });
@@ -258,17 +261,41 @@ export default class Room {
     }
   }
 
+  canSendMessage({
+    fromUserId,
+    message,
+  }: {
+    fromUserId: string;
+    message: string;
+  }): Boolean {
+    const isUserWriter = fromUserId === this._currentPlayer?.id;
+    const isMessageCorrect =
+      message.toLowerCase() === this._currentTopic.toLowerCase();
+    if (!isUserWriter && !isMessageCorrect) {
+      return true;
+    }
+
+    return false;
+  }
+
   handleChat({ fromUserId, message }: { fromUserId: string; message: string }) {
     const canSendMessage = fromUserId !== this._currentPlayer?.id;
 
-    if (canSendMessage) {
-      const playerSendingMessage = this._players.find(
-        ({ id }) => id === fromUserId
-      );
+    const playerSendingMessage = this._players.find(
+      ({ id }) => id === fromUserId
+    );
 
-      if (playerSendingMessage) {
-        this.handleScore({ user: playerSendingMessage, message });
+    if (playerSendingMessage) {
+      if (this.canSendMessage({ fromUserId, message })) {
+        this._io
+          .to(this._id)
+          .emit("room:chat", {
+            fromUser: { ...playerSendingMessage },
+            message,
+          });
       }
+
+      this.handleScore({ user: playerSendingMessage, message });
     }
   }
 
@@ -297,12 +324,6 @@ export default class Room {
 
   private handleScore({ user, message }: { user: User; message: string }) {
     const canScore = this.canScore({ user, message });
-
-    if (!canScore) {
-      this._io
-        .to(this._id)
-        .emit("room:chat", { fromUser: { ...user }, message });
-    }
 
     if (canScore) {
       this.makeScore(user);
