@@ -270,8 +270,7 @@ export default class Room {
     message: string;
   }): Boolean {
     const isUserWriter = fromUserId === this._currentPlayer?.id;
-    const isMessageCorrect =
-      message.toLowerCase() === this._currentTopic.toLowerCase();
+    const isMessageCorrect = message?.toLowerCase() === this._currentTopic?.toLowerCase();
     if (!isUserWriter && !isMessageCorrect) {
       return true;
     }
@@ -280,8 +279,6 @@ export default class Room {
   }
 
   handleChat({ fromUserId, message }: { fromUserId: string; message: string }) {
-    const canSendMessage = fromUserId !== this._currentPlayer?.id;
-
     const playerSendingMessage = this._players.find(
       ({ id }) => id === fromUserId
     );
