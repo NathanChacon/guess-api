@@ -15,6 +15,7 @@ enum Points {
 export default class Room {
   private _name: string;
   private _id: string;
+  private _alreadyListedTopics: Array<string> = []
   private _currentTopic: string | null;
   private _currentDescription: string | null;
   private _currentPlayer: User | null;
