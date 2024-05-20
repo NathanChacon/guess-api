@@ -6,6 +6,7 @@ import {
   UserAlreadyRegisteredError,
 } from "../errors/UserErrors";
 import { RoomIsFullError } from "../errors/RoomErrors";
+import { Topic } from "./Topic";
 
 enum Points {
   writerPoint = 10,
@@ -15,8 +16,6 @@ enum Points {
 export default class Room {
   private _name: string;
   private _id: string;
-  private _alreadyListedTopics: Array<string> = []
-  private _currentTopic: string | null;
   private _currentDescription: string | null;
   private _currentPlayer: User | null;
   private _players: Array<User>;
@@ -27,11 +26,11 @@ export default class Room {
   private _maxPlayers = 12;
   private _writerPoint = Points.writerPoint;
   private _guesserPoint = Points.guesserPoint;
+  private topic = new Topic(topics)
 
   constructor(name: string, id: string, io: Server) {
     this._name = name;
     this._id = id;
-    this._currentTopic = null;
     this._currentPlayer = null;
     this._alreadyPlayed = [];
     this._players = [];
@@ -51,10 +50,6 @@ export default class Room {
 
   set id(id: string) {
     this._id = id;
-  }
-
-  get currentTopic(): string | null {
-    return this._currentTopic;
   }
 
   get currentPlayer(): User | null {
@@ -116,12 +111,6 @@ export default class Room {
     }
   }
 
-  private generateTopic() {
-    const randomIndex = Math.floor(Math.random() * topics.length);
-    const topic = topics[randomIndex];
-    this._currentTopic = topic;
-  }
-
   private stopCountdown() {
     clearInterval(this._countDownRef);
   }
@@ -136,7 +125,7 @@ export default class Room {
       this._io.to(this._id).emit("room:timer", timeLeft);
 
       // If the countdown reaches zero, stop the interval
-      if (timeLeft === 0 || !this._currentTopic || !this._currentPlayer) {
+      if (timeLeft === 0 || !this.topic.currentTopic || !this._currentPlayer) {
         this.handleNextMatch();
         clearInterval(countdownInterval);
       }
@@ -198,11 +187,11 @@ export default class Room {
     this._alreadyPlayed = newAlreadyPlayedArray;
     if (newPlayersArray.length === 1) {
       this._currentPlayer = null;
-      this._currentTopic = null;
+      this.topic.clear();
       await this._io.to(this._id).emit("room:stop", {});
     } else if (this._currentPlayer?.id === playerId) {
       this._currentPlayer = null;
-      this._currentTopic = null;
+      this.topic.clear()
       this.handleNextMatch();
     }
   }
@@ -247,22 +236,21 @@ export default class Room {
     this._currentDescription = null;
 
     if (this._players.length >= 2) {
-      const previousTopic = this._currentTopic;
       this.handleNextPlayer();
-      this.generateTopic();
+      this.topic.generate()
 
       await this._io.to(this._id).emit("room:next-match", {
         currentPlayer: this._currentPlayer,
-        previousTopic,
+        previousTopic: this.topic.previousTopic,
       });
       await this._io
         .to(this._currentPlayer?.id || "")
-        .emit("room:topic", { topic: this._currentTopic });
+        .emit("room:topic", { topic: this.topic.currentTopic });
 
       this.startCountDown();
     } else {
       this._currentPlayer = null;
-      this._currentTopic = null;
+      this.topic.clear();
       await this._io.to(this._id).emit("room:stop", {});
     }
   }
@@ -275,7 +263,7 @@ export default class Room {
     message: string;
   }): Boolean {
     const isUserWriter = fromUserId === this._currentPlayer?.id;
-    const isMessageCorrect = message?.toLowerCase() === this._currentTopic?.toLowerCase();
+    const isMessageCorrect = message?.toLowerCase() === this.topic.currentTopic?.toLowerCase();
     if (!isUserWriter && !isMessageCorrect) {
       return true;
     }
@@ -303,9 +291,9 @@ export default class Room {
   }
 
   private canScore({ user, message }: { user: User; message: string }) {
-    if (message && this._currentTopic) {
+    if (message && this.topic.currentTopic) {
       const isMessageCorrect =
-        message.toLowerCase() === this._currentTopic.toLowerCase();
+        message.toLowerCase() === this.topic.currentTopic.toLowerCase();
       const playerAlreadyScored = this._alreadyScored.some(
         ({ id }) => id === user?.id
       );

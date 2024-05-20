@@ -31,8 +31,8 @@ export default (io: Server, socket: Socket) => {
             
             socket.data.currentRoom = roomId
     
-            await room.join(user)
             await socket.join(roomId);
+            await room.join(user)
     
             const playersInRoom = room.players.filter(({id}) => id !== socket.id)
 
