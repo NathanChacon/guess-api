@@ -69,7 +69,8 @@ app.get('/rooms', (req, res) => {
         return {
             title: room.name,
             id: room.id,
-            players: room.players.length
+            players: room.players.length,
+            maxPlayers: room.maxPlayers
         }
     })
     res.json({rooms: formattedRooms});

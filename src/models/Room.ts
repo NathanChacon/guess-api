@@ -24,7 +24,7 @@ export default class Room {
   private _alreadyScored: Array<User>;
   private _countDownRef: any;
   private _io: Server;
-  private _maxPlayers = 5;
+  private _maxPlayers = 12;
   private _writerPoint = Points.writerPoint;
   private _guesserPoint = Points.guesserPoint;
 
@@ -67,6 +67,11 @@ export default class Room {
 
   get players(): Array<User> {
     return this._players;
+  }
+
+  
+  get maxPlayers(): number {
+    return this._maxPlayers;
   }
 
   private isValidUserName(userName: string) {
