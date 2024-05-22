@@ -7,6 +7,7 @@ import {
 } from "../errors/UserErrors";
 import { RoomIsFullError } from "../errors/RoomErrors";
 import { Topic } from "./Topic";
+import {Line} from "./Line";
 
 enum Points {
   writerPoint = 10,
@@ -19,7 +20,6 @@ export default class Room {
   private _currentDescription: string | null;
   private _currentPlayer: User | null;
   private _players: Array<User>;
-  private _alreadyPlayed: Array<User>;
   private _alreadyScored: Array<User>;
   private _countDownRef: any;
   private _io: Server;
@@ -27,12 +27,12 @@ export default class Room {
   private _writerPoint = Points.writerPoint;
   private _guesserPoint = Points.guesserPoint;
   private topic = new Topic(topics)
+  private line = new Line([])
 
   constructor(name: string, id: string, io: Server) {
     this._name = name;
     this._id = id;
     this._currentPlayer = null;
-    this._alreadyPlayed = [];
     this._players = [];
     this._alreadyScored = [];
     this._currentDescription = null;
@@ -106,9 +106,7 @@ export default class Room {
   }
 
   addPlayer(player: User) {
-    if (!this.hasUser(player.id)) {
       this._players.push(player);
-    }
   }
 
   private stopCountdown() {
@@ -134,57 +132,22 @@ export default class Room {
     this._countDownRef = countdownInterval;
   }
 
-  private getSortedPlayersByJoinTime(): Array<User> {
-    return this._players.sort(
-      (playerA: any, playerB: any) => playerA.joinTime - playerB.joinTime
-    );
-  }
-
-  private getPlayersWaiting(players: Array<User>) {
-    return players.filter(({ id }) => {
-      const hasPlayed = this._alreadyPlayed.some(
-        (alreadyPlayedUser) => alreadyPlayedUser.id === id
-      );
-      return !hasPlayed;
-    });
-  }
-
-  private handleNextWaitingPlayer(): User {
-    const needToFindNext = this._alreadyPlayed.length >= 1;
-    const sortedPlayersByJoinTime = this.getSortedPlayersByJoinTime();
-    const playersWaitingToPlay = this.getPlayersWaiting(
-      sortedPlayersByJoinTime
-    );
-    const nextWaitingPlayer = playersWaitingToPlay[0];
-
-    if (!needToFindNext) {
-      return sortedPlayersByJoinTime[0];
-    }
-    if (nextWaitingPlayer) {
-      return nextWaitingPlayer;
-    } else {
-      this._alreadyPlayed = [];
-      return sortedPlayersByJoinTime[0];
-    }
-  }
-
   private handleNextPlayer() {
-    const nextPlayer = this.handleNextWaitingPlayer();
+    const nextPlayer = this.line.getNextPlayer()
     this._currentPlayer = nextPlayer;
-    this._alreadyPlayed.push(nextPlayer);
   }
 
   async removePlayer(playerId: string) {
     const playerRemoved = this._players.find(({ id }) => id === playerId);
     const newPlayersArray = this._players.filter(({ id }) => id !== playerId);
-    const newAlreadyPlayedArray = this._alreadyPlayed.filter(
-      ({ id }) => id !== playerId
-    );
+
+
+    this.line.removePlayer(playerId)
 
     await this._io.to(this._id).emit("room:user-leave", { ...playerRemoved });
 
     this._players = newPlayersArray;
-    this._alreadyPlayed = newAlreadyPlayedArray;
+
     if (newPlayersArray.length === 1) {
       this._currentPlayer = null;
       this.topic.clear();
@@ -200,13 +163,14 @@ export default class Room {
     const isRoomFull = this._players.length === this._maxPlayers;
     const isValidName = this.isValidUserName(user.name);
     const isNameAlreadyInTheRoom = this.nameAlreadyExistis(user.name);
-    const isValidUser = isValidName && !isNameAlreadyInTheRoom;
+    const isValidUser = isValidName && !isNameAlreadyInTheRoom && !this.hasUser(user.id);
 
     if (isRoomFull) {
       throw new RoomIsFullError("Room is full");
     }
 
     if (isValidUser) {
+      this.line.addPlayer(user)
       this.addPlayer(user);
 
       this.startRoom();

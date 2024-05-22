@@ -4,6 +4,7 @@ export default class User {
     points: number = 0;
     joinTime: Date;
     id: string;
+    hasPlayed: boolean = false
 
     constructor(name: string, id: string, roomId: string, points: number, joinTime: Date) {
         this.name = name;
