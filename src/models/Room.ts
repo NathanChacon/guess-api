@@ -8,11 +8,7 @@ import {
 import { RoomIsFullError } from "../errors/RoomErrors";
 import { Topic } from "./Topic";
 import {Line} from "./Line";
-
-enum Points {
-  writerPoint = 10,
-  guesserPoint = 20,
-}
+import { Score } from "./Score";
 
 export default class Room {
   private _name: string;
@@ -20,24 +16,23 @@ export default class Room {
   private _currentDescription: string | null;
   private _currentPlayer: User | null;
   private _players: Array<User>;
-  private _alreadyScored: Array<User>;
   private _countDownRef: any;
   private _io: Server;
   private _maxPlayers = 12;
-  private _writerPoint = Points.writerPoint;
-  private _guesserPoint = Points.guesserPoint;
   private topic = new Topic(topics)
   private line = new Line([])
+  private score: Score 
 
   constructor(name: string, id: string, io: Server) {
     this._name = name;
     this._id = id;
     this._currentPlayer = null;
     this._players = [];
-    this._alreadyScored = [];
     this._currentDescription = null;
     this._io = io;
     this._countDownRef = "";
+
+    this.score = new Score(this.topic, this.line, io)
   }
 
   get name(): string {
@@ -196,7 +191,7 @@ export default class Room {
 
   async handleNextMatch() {
     this.stopCountdown();
-    this._alreadyScored = [];
+    this.score.resetUsersScores();
     this._currentDescription = null;
 
     if (this._players.length >= 2) {
@@ -250,42 +245,11 @@ export default class Room {
           });
       }
 
-      this.handleScore({ user: playerSendingMessage, message });
-    }
-  }
-
-  private canScore({ user, message }: { user: User; message: string }) {
-    if (message && this.topic.currentTopic) {
-      const isMessageCorrect =
-        message.toLowerCase() === this.topic.currentTopic.toLowerCase();
-      const playerAlreadyScored = this._alreadyScored.some(
-        ({ id }) => id === user?.id
-      );
-      return isMessageCorrect && !playerAlreadyScored;
-    }
-
-    return false;
-  }
-
-  private makeScore(user: User) {
-    this._alreadyScored.push(user);
-
-    user?.addPoint(this._guesserPoint);
-    this.currentPlayer?.addPoint(this._writerPoint);
-    this._io
-      .to(this._id)
-      .emit("room:score", { user, writer: this._currentPlayer });
-  }
-
-  private handleScore({ user, message }: { user: User; message: string }) {
-    const canScore = this.canScore({ user, message });
-
-    if (canScore) {
-      this.makeScore(user);
-    }
-
-    if (this._alreadyScored.length === this._players.length - 1) {
-      this.handleNextMatch();
+      this.score.handleScore({user: playerSendingMessage, message, roomId: this._id})
+    
+      if (this.score.isEveryoneScored()) {
+          this.handleNextMatch();
+      }
     }
   }
 
