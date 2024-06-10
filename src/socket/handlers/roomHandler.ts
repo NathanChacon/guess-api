@@ -2,7 +2,7 @@ import { Socket, Server} from 'socket.io';
 import User from '../../models/User'
 import Room from '../../models/Room'
 import gameState from '../../gameState';
-import { InvalidUserNameError, UserAlreadyRegisteredError } from '../../errors/UserErrors';
+import { InvalidUserNameError, UserAlreadyRegisteredError, UserAlreadyJoinedError } from '../../errors/UserErrors';
 import { RoomIsFullError } from '../../errors/RoomErrors';
  
 
@@ -50,7 +50,7 @@ export default (io: Server, socket: Socket) => {
              }})
         }
         catch(error){
-            if(error instanceof InvalidUserNameError || error instanceof UserAlreadyRegisteredError || error instanceof RoomIsFullError) {
+            if(error instanceof InvalidUserNameError || error instanceof UserAlreadyRegisteredError || error instanceof RoomIsFullError || error instanceof UserAlreadyJoinedError) {
                 callback({
                     status: error.statusCode,
                     message: error.message,

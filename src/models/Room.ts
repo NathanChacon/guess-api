@@ -4,12 +4,13 @@ import { Server } from "socket.io";
 import {
   InvalidUserNameError,
   UserAlreadyRegisteredError,
+  UserAlreadyJoinedError,
 } from "../errors/UserErrors";
 import { RoomIsFullError } from "../errors/RoomErrors";
 import { Topic } from "./Topic";
-import {Line} from "./Line";
+import { Line } from "./Line";
 import { Score } from "./Score";
-
+import { UserValidator } from "./UserValidator";
 export default class Room {
   private _name: string;
   private _id: string;
@@ -19,9 +20,10 @@ export default class Room {
   private _countDownRef: any;
   private _io: Server;
   private _maxPlayers = 12;
-  private topic = new Topic(topics)
-  private line = new Line([])
-  private score: Score 
+  private topic = new Topic(topics);
+  private line = new Line([]);
+  private score: Score;
+  private userValidator: UserValidator = new UserValidator(this.line);
 
   constructor(name: string, id: string, io: Server) {
     this._name = name;
@@ -32,7 +34,7 @@ export default class Room {
     this._io = io;
     this._countDownRef = "";
 
-    this.score = new Score(this.topic, this.line, io)
+    this.score = new Score(this.topic, this.line, io);
   }
 
   get name(): string {
@@ -59,49 +61,12 @@ export default class Room {
     return this._players;
   }
 
-  
   get maxPlayers(): number {
     return this._maxPlayers;
   }
 
-  private isValidUserName(userName: string) {
-    // Check if username is not empty
-    if (userName.trim() === "") {
-      return false;
-    }
-
-    // Check if userName has more than 10 characters
-    if (userName.length > 10) {
-      return false;
-    }
-
-    // Check if userName contains special characters
-    var specialCharacters = /[!@#$%^&*(),.?":{}|<>]/;
-    if (specialCharacters.test(userName)) {
-      return false;
-    }
-
-    // Check if userName contains empty spaces
-    if (/\s/.test(userName)) {
-      return false;
-    }
-
-    // If all checks pass, userName is valid
-    return true;
-  }
-
-  private nameAlreadyExistis(userName: string) {
-    return this._players.some(
-      ({ name }) => userName.toLowerCase() === name.toLowerCase()
-    );
-  }
-
-  hasUser(userId: string): boolean {
-    return this._players.some(({ id }) => id === userId);
-  }
-
   addPlayer(player: User) {
-      this._players.push(player);
+    this._players.push(player);
   }
 
   private stopCountdown() {
@@ -128,7 +93,7 @@ export default class Room {
   }
 
   private handleNextPlayer() {
-    const nextPlayer = this.line.getNextPlayer()
+    const nextPlayer = this.line.getNextPlayer();
     this._currentPlayer = nextPlayer;
   }
 
@@ -136,8 +101,7 @@ export default class Room {
     const playerRemoved = this._players.find(({ id }) => id === playerId);
     const newPlayersArray = this._players.filter(({ id }) => id !== playerId);
 
-
-    this.line.removePlayer(playerId)
+    this.line.removePlayer(playerId);
 
     await this._io.to(this._id).emit("room:user-leave", { ...playerRemoved });
 
@@ -149,23 +113,30 @@ export default class Room {
       await this._io.to(this._id).emit("room:stop", {});
     } else if (this._currentPlayer?.id === playerId) {
       this._currentPlayer = null;
-      this.topic.clear()
+      this.topic.clear();
       this.handleNextMatch();
     }
   }
 
   async join(user: User) {
     const isRoomFull = this._players.length === this._maxPlayers;
-    const isValidName = this.isValidUserName(user.name);
-    const isNameAlreadyInTheRoom = this.nameAlreadyExistis(user.name);
-    const isValidUser = isValidName && !isNameAlreadyInTheRoom && !this.hasUser(user.id);
+    const isValidName = this.userValidator.isValidUserName(user.name);
+    const isNameAlreadyInTheRoom = this.userValidator.nameAlreadyExistis(
+      user.name
+    );
+    const userAlreadyJoined = this.userValidator.isUserAlreadyInTheRoom(
+      user.id
+    );
+
+    const isValidUser =
+      isValidName && !isNameAlreadyInTheRoom && !userAlreadyJoined;
 
     if (isRoomFull) {
       throw new RoomIsFullError("Room is full");
     }
 
     if (isValidUser) {
-      this.line.addPlayer(user)
+      this.line.addPlayer(user);
       this.addPlayer(user);
 
       this.startRoom();
@@ -176,6 +147,10 @@ export default class Room {
 
       if (isNameAlreadyInTheRoom) {
         throw new UserAlreadyRegisteredError("Name already registered");
+      }
+
+      if (userAlreadyJoined) {
+        throw new UserAlreadyJoinedError("User already joined");
       }
     }
   }
@@ -196,7 +171,7 @@ export default class Room {
 
     if (this._players.length >= 2) {
       this.handleNextPlayer();
-      this.topic.generate()
+      this.topic.generate();
 
       await this._io.to(this._id).emit("room:next-match", {
         currentPlayer: this._currentPlayer,
@@ -222,7 +197,8 @@ export default class Room {
     message: string;
   }): Boolean {
     const isUserWriter = fromUserId === this._currentPlayer?.id;
-    const isMessageCorrect = message?.toLowerCase() === this.topic.currentTopic?.toLowerCase();
+    const isMessageCorrect =
+      message?.toLowerCase() === this.topic.currentTopic?.toLowerCase();
     if (!isUserWriter && !isMessageCorrect) {
       return true;
     }
@@ -237,18 +213,20 @@ export default class Room {
 
     if (playerSendingMessage) {
       if (this.canSendMessage({ fromUserId, message })) {
-        this._io
-          .to(this._id)
-          .emit("room:chat", {
-            fromUser: { ...playerSendingMessage },
-            message,
-          });
+        this._io.to(this._id).emit("room:chat", {
+          fromUser: { ...playerSendingMessage },
+          message,
+        });
       }
 
-      this.score.handleScore({user: playerSendingMessage, message, roomId: this._id})
-    
+      this.score.handleScore({
+        user: playerSendingMessage,
+        message,
+        roomId: this._id,
+      });
+
       if (this.score.isEveryoneScored()) {
-          this.handleNextMatch();
+        this.handleNextMatch();
       }
     }
   }
